@@ -220,13 +220,21 @@ async function optimizePortfolio() {
             const notionalPerContract = data.strike * 100;
             const contracts = Math.floor(allocation / notionalPerContract);
 
-            if (contracts < 1) continue;
+            if (contracts < 1) {
+                console.log(`${data.etf}: Skipped - less than 1 contract`);
+                continue;
+            }
 
             const totalNotional = contracts * notionalPerContract;
             const totalPremium = contracts * data.bid * 100;
 
+            console.log(`${data.etf}: ${contracts} contracts, bid=$${data.bid}, premium=$${totalPremium.toFixed(2)}`);
+
             // Skip ETFs where premium is less than $1000 (overrides 1% min allocation)
-            if (totalPremium < 1000) continue;
+            if (totalPremium < 1000) {
+                console.log(`${data.etf}: Skipped - premium $${totalPremium.toFixed(2)} < $1000`);
+                continue;
+            }
 
             optimizationResults.push({
                 etf: data.etf,
