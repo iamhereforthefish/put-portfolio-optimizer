@@ -252,6 +252,7 @@ async function optimizePortfolio() {
                 contracts,
                 premium: totalPremium,
                 notional: totalNotional,
+                notionalPerContract: notionalPerContract,
                 annualizedYield: data.annualizedYield,
                 actualOTM: data.actualOTM,
                 optionSymbol: data.optionSymbol
@@ -263,6 +264,44 @@ async function optimizePortfolio() {
             optimizeBtn.disabled = false;
             return;
         }
+
+        // Step 3b: Ensure total notional is at least 85% of nominal exposure
+        const minNotional = nominalExposure * 0.85;
+        let currentTotalNotional = optimizationResults.reduce((sum, r) => sum + r.notional, 0);
+
+        console.log(`Initial total notional: $${currentTotalNotional.toLocaleString()} (target min: $${minNotional.toLocaleString()})`);
+
+        // Sort results by yield (highest first) for adding contracts
+        optimizationResults.sort((a, b) => b.annualizedYield - a.annualizedYield);
+
+        // Add contracts to reach 85% minimum
+        while (currentTotalNotional < minNotional) {
+            let addedContract = false;
+
+            // Try to add one contract to the highest-yielding ETF that can accept more
+            for (const result of optimizationResults) {
+                const newNotional = currentTotalNotional + result.notionalPerContract;
+
+                // Check if adding this contract would exceed total nominal exposure significantly
+                if (newNotional <= nominalExposure * 1.05) {
+                    result.contracts += 1;
+                    result.notional += result.notionalPerContract;
+                    result.premium = result.contracts * result.bid * 100;
+                    currentTotalNotional = newNotional;
+                    addedContract = true;
+                    console.log(`Added 1 contract to ${result.etf}, new total notional: $${currentTotalNotional.toLocaleString()}`);
+                    break;
+                }
+            }
+
+            // If we couldn't add any contract, break to avoid infinite loop
+            if (!addedContract) {
+                console.log('Cannot add more contracts without exceeding exposure limit');
+                break;
+            }
+        }
+
+        console.log(`Final total notional: $${currentTotalNotional.toLocaleString()} (${((currentTotalNotional / nominalExposure) * 100).toFixed(1)}% of target)`);
 
         // Step 4: Calculate portfolio beta
         showStatus('Calculating portfolio beta...', 'loading');
