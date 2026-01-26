@@ -360,6 +360,9 @@ async function findBestOptionData(etf, targetDTE, targetOTM) {
     const minDTE = Math.max(1, targetDTE - 20);
     const maxDTE = targetDTE + 35;
 
+    // Check if monthly-only filter is enabled
+    const monthlyOnly = document.getElementById('monthly-only')?.checked || false;
+
     // Filter expirations within the allowed range
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -367,7 +370,14 @@ async function findBestOptionData(etf, targetDTE, targetOTM) {
     const validExpirations = expirations.filter(exp => {
         const expDate = new Date(exp + 'T00:00:00');
         const dte = Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
-        return dte >= minDTE && dte <= maxDTE;
+
+        // Check DTE range
+        if (dte < minDTE || dte > maxDTE) return false;
+
+        // If monthly-only is checked, only include third Friday expirations
+        if (monthlyOnly && !isThirdFriday(exp)) return false;
+
+        return true;
     });
 
     if (validExpirations.length === 0) return null;
@@ -499,6 +509,22 @@ function calculateDaysToExpiry(expirationDate) {
     const expiry = new Date(expirationDate + 'T00:00:00');
     const diffTime = expiry - today;
     return Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+}
+
+/**
+ * Check if a date is the third Friday of its month
+ */
+function isThirdFriday(dateStr) {
+    const date = new Date(dateStr + 'T00:00:00');
+
+    // Check if it's a Friday (day 5)
+    if (date.getDay() !== 5) return false;
+
+    // Get the day of the month
+    const dayOfMonth = date.getDate();
+
+    // Third Friday falls between the 15th and 21st
+    return dayOfMonth >= 15 && dayOfMonth <= 21;
 }
 
 /**
