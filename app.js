@@ -213,81 +213,97 @@ async function optimizePortfolio() {
 
 /**
  * Find the best put option for an ETF
+ * Searches expirations within range: (targetDTE - 20 days) to (targetDTE + 35 days)
+ * Picks the option with highest annualized yield
  */
 async function findBestPut(etf, allocation, targetDTE, targetOTM) {
     // Get stock price
     const stockData = await fetchStockQuote(etf);
     if (!stockData || !stockData.price) return null;
 
-    // Find expiration closest to target DTE
+    // Get all expirations
     const expirations = await fetchExpirations(etf);
     if (!expirations || expirations.length === 0) return null;
 
-    const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() + targetDTE);
+    // Define DTE range: 20 days shorter to 35 days longer than target
+    const minDTE = Math.max(1, targetDTE - 20);
+    const maxDTE = targetDTE + 35;
 
-    let bestExpiration = expirations[0];
-    let bestDiff = Infinity;
+    // Filter expirations within the allowed range
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-    for (const exp of expirations) {
+    const validExpirations = expirations.filter(exp => {
         const expDate = new Date(exp + 'T00:00:00');
-        const diff = Math.abs(expDate - targetDate);
-        if (diff < bestDiff) {
-            bestDiff = diff;
-            bestExpiration = exp;
-        }
-    }
+        const dte = Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
+        return dte >= minDTE && dte <= maxDTE;
+    });
+
+    if (validExpirations.length === 0) return null;
 
     // Calculate target strike (OTM put)
     const targetStrike = stockData.price * (1 - targetOTM / 100);
 
-    // Get option chain
-    const chain = await fetchOptionChain(etf, bestExpiration, 'put');
-    if (!chain || chain.length === 0) return null;
+    // Track best option across all valid expirations
+    let bestResult = null;
+    let bestYield = -Infinity;
 
-    // Find closest strike to target
-    let bestOption = null;
-    let closestDiff = Infinity;
+    // Search all valid expirations for the highest yielding option
+    for (const expiration of validExpirations) {
+        const chain = await fetchOptionChain(etf, expiration, 'put');
+        if (!chain || chain.length === 0) continue;
 
-    for (const option of chain) {
-        const diff = Math.abs(option.strike - targetStrike);
-        if (diff < closestDiff && option.bid > 0.05) {
-            closestDiff = diff;
-            bestOption = option;
+        // Find closest strike to target OTM
+        let closestOption = null;
+        let closestDiff = Infinity;
+
+        for (const option of chain) {
+            const diff = Math.abs(option.strike - targetStrike);
+            if (diff < closestDiff && option.bid > 0.05) {
+                closestDiff = diff;
+                closestOption = option;
+            }
+        }
+
+        if (!closestOption) continue;
+
+        // Calculate metrics for this option
+        const dte = calculateDaysToExpiry(expiration);
+        const notionalPerContract = closestOption.strike * 100;
+        const contracts = Math.floor(allocation / notionalPerContract);
+
+        if (contracts < 1) continue;
+
+        const periodYield = closestOption.bid / stockData.price;
+        const annualizedYield = periodYield * (365 / dte);
+
+        // Keep track of the highest yielding option
+        if (annualizedYield > bestYield) {
+            bestYield = annualizedYield;
+            const totalNotional = contracts * notionalPerContract;
+            const totalPremium = contracts * closestOption.bid * 100;
+            const actualOTM = ((stockData.price - closestOption.strike) / stockData.price) * 100;
+
+            bestResult = {
+                etf,
+                weight: currentWeights[etf],
+                stockPrice: stockData.price,
+                strike: closestOption.strike,
+                expiration,
+                dte,
+                bid: closestOption.bid,
+                ask: closestOption.ask,
+                contracts,
+                premium: totalPremium,
+                notional: totalNotional,
+                annualizedYield,
+                actualOTM,
+                optionSymbol: closestOption.symbol
+            };
         }
     }
 
-    if (!bestOption) return null;
-
-    // Calculate contracts and metrics
-    const dte = calculateDaysToExpiry(bestExpiration);
-    const notionalPerContract = bestOption.strike * 100;
-    const contracts = Math.floor(allocation / notionalPerContract);
-
-    if (contracts < 1) return null;
-
-    const totalNotional = contracts * notionalPerContract;
-    const totalPremium = contracts * bestOption.bid * 100;
-    const periodYield = bestOption.bid / stockData.price;
-    const annualizedYield = periodYield * (365 / dte);
-    const actualOTM = ((stockData.price - bestOption.strike) / stockData.price) * 100;
-
-    return {
-        etf,
-        weight: currentWeights[etf],
-        stockPrice: stockData.price,
-        strike: bestOption.strike,
-        expiration: bestExpiration,
-        dte,
-        bid: bestOption.bid,
-        ask: bestOption.ask,
-        contracts,
-        premium: totalPremium,
-        notional: totalNotional,
-        annualizedYield,
-        actualOTM,
-        optionSymbol: bestOption.symbol
-    };
+    return bestResult;
 }
 
 /**
