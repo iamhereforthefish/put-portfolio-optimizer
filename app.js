@@ -376,7 +376,7 @@ async function findBestOptionData(etf, targetDTE, targetOTM) {
 
         for (const option of chain) {
             const diff = Math.abs(option.strike - targetStrike);
-            if (diff < closestDiff && option.bid > 0.05) {
+            if (diff < closestDiff && option.bid >= 0.50) {
                 closestDiff = diff;
                 closestOption = option;
             }
@@ -488,24 +488,23 @@ function calculateDaysToExpiry(expirationDate) {
  * Returns array of closing prices (oldest to newest)
  */
 async function fetchHistoricalPrices(ticker, days = 90) {
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-
-    const fromStr = startDate.toISOString().split('T')[0];
-    const toStr = endDate.toISOString().split('T')[0];
-
-    const url = `${MARKETDATA_API.baseUrl}/stocks/candles/D/${ticker}/?from=${fromStr}&to=${toStr}`;
+    // Use countback parameter to get last N trading days
+    const url = `${MARKETDATA_API.baseUrl}/stocks/candles/D/${ticker}/?countback=${days}`;
 
     try {
         const response = await fetch(url, {
             headers: { 'Authorization': `Token ${MARKETDATA_API.token}` }
         });
 
-        if (!response.ok) return null;
+        if (!response.ok) {
+            console.error(`Historical data API error for ${ticker}: ${response.status}`);
+            return null;
+        }
 
         const data = await response.json();
-        if (data.s !== 'ok' || !data.c) return null;
+        console.log(`Historical data for ${ticker}:`, data.s, data.c ? data.c.length + ' prices' : 'no data');
+
+        if (data.s !== 'ok' || !data.c || data.c.length === 0) return null;
 
         // Return closing prices
         return data.c;
@@ -571,25 +570,50 @@ function calculateVariance(arr) {
  */
 async function calculatePortfolioBeta(optimizedWeights) {
     try {
+        console.log('Starting beta calculation...');
+        console.log('Optimized weights:', optimizedWeights);
+
         // Fetch SPY (market) historical prices
         const spyPrices = await fetchHistoricalPrices('SPY', 90);
         if (!spyPrices || spyPrices.length < 10) {
             console.error('Could not fetch SPY historical data');
             return null;
         }
+        console.log(`SPY prices fetched: ${spyPrices.length} data points`);
 
         const marketReturns = calculateReturns(spyPrices);
-        if (marketReturns.length === 0) return null;
+        if (marketReturns.length === 0) {
+            console.error('No market returns calculated');
+            return null;
+        }
+        console.log(`Market returns calculated: ${marketReturns.length} returns`);
 
         // Fetch historical prices for each ETF in the portfolio
         const etfReturnsMap = {};
         const activeETFs = Object.keys(optimizedWeights).filter(etf => optimizedWeights[etf] > 0);
+        console.log('Active ETFs:', activeETFs);
 
         for (const etf of activeETFs) {
+            // Skip SPY since it's the benchmark
+            if (etf === 'SPY') {
+                etfReturnsMap[etf] = marketReturns;
+                console.log(`${etf}: using market returns (benchmark)`);
+                continue;
+            }
+
             const prices = await fetchHistoricalPrices(etf, 90);
             if (prices && prices.length >= 10) {
                 etfReturnsMap[etf] = calculateReturns(prices);
+                console.log(`${etf}: ${etfReturnsMap[etf].length} returns calculated`);
+            } else {
+                console.log(`${etf}: insufficient data, skipping`);
             }
+        }
+
+        // Check if we have any ETF data
+        if (Object.keys(etfReturnsMap).length === 0) {
+            console.error('No ETF return data available');
+            return null;
         }
 
         // Find the minimum length across all return series (to align dates)
@@ -597,8 +621,12 @@ async function calculatePortfolioBeta(optimizedWeights) {
         for (const etf of Object.keys(etfReturnsMap)) {
             minLength = Math.min(minLength, etfReturnsMap[etf].length);
         }
+        console.log(`Using ${minLength} aligned data points`);
 
-        if (minLength < 5) return null;
+        if (minLength < 5) {
+            console.error('Insufficient aligned data points');
+            return null;
+        }
 
         // Trim all return series to the same length (most recent data)
         const trimmedMarketReturns = marketReturns.slice(-minLength);
@@ -622,15 +650,24 @@ async function calculatePortfolioBeta(optimizedWeights) {
             }
         }
 
-        if (portfolioReturns.length < 5) return null;
+        if (portfolioReturns.length < 5) {
+            console.error('Insufficient portfolio returns');
+            return null;
+        }
 
         // Calculate beta: Cov(R_p, R_m) / Var(R_m)
         const covariance = calculateCovariance(portfolioReturns, trimmedMarketReturns);
         const marketVariance = calculateVariance(trimmedMarketReturns);
 
-        if (marketVariance === 0) return null;
+        console.log(`Covariance: ${covariance}, Market Variance: ${marketVariance}`);
+
+        if (marketVariance === 0) {
+            console.error('Market variance is zero');
+            return null;
+        }
 
         const beta = covariance / marketVariance;
+        console.log(`Calculated portfolio beta: ${beta.toFixed(4)}`);
         return beta;
 
     } catch (error) {
