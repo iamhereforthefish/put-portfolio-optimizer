@@ -225,6 +225,9 @@ async function optimizePortfolio() {
             const totalNotional = contracts * notionalPerContract;
             const totalPremium = contracts * data.bid * 100;
 
+            // Skip ETFs where premium is less than $1000 (overrides 1% min allocation)
+            if (totalPremium < 1000) continue;
+
             optimizationResults.push({
                 etf: data.etf,
                 weight: optimizedWeight,
