@@ -23,7 +23,7 @@
                         <label for="nominal-exposure">Total Nominal Exposure</label>
                         <div class="input-with-prefix">
                             <span class="prefix">$</span>
-                            <input type="number" id="nominal-exposure" value="100000" min="1000" step="1000">
+                            <input type="text" id="nominal-exposure" value="100,000" oninput="formatExposureInput(this)" onblur="formatExposureInput(this)">
                         </div>
                         <span class="param-hint">Total capital to allocate across puts</span>
                     </div>

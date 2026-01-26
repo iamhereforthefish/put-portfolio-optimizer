@@ -165,7 +165,7 @@ async function optimizePortfolio() {
     }
 
     // Get parameters
-    const nominalExposure = parseFloat(document.getElementById('nominal-exposure').value) || 100000;
+    const nominalExposure = getNominalExposure();
     const targetDTE = parseInt(document.getElementById('target-dte').value) || 30;
     const targetOTM = parseFloat(document.getElementById('otm-target').value) || 10;
 
@@ -419,7 +419,7 @@ function copyTradeOrder() {
         return;
     }
 
-    const nominalExposure = document.getElementById('nominal-exposure').value;
+    const nominalExposure = getNominalExposure();
     const targetDTE = document.getElementById('target-dte').value;
     const targetOTM = document.getElementById('otm-target').value;
 
@@ -531,6 +531,36 @@ function formatDate(dateStr) {
         day: 'numeric',
         year: 'numeric'
     });
+}
+
+/**
+ * Format exposure input with commas
+ */
+function formatExposureInput(input) {
+    // Remove non-numeric characters except decimal
+    let value = input.value.replace(/[^0-9.]/g, '');
+
+    // Parse as number
+    let num = parseFloat(value);
+    if (isNaN(num)) {
+        input.value = '';
+        return;
+    }
+
+    // Format with commas
+    input.value = num.toLocaleString('en-US', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2
+    });
+}
+
+/**
+ * Get nominal exposure value (removes commas)
+ */
+function getNominalExposure() {
+    const input = document.getElementById('nominal-exposure');
+    const value = input.value.replace(/,/g, '');
+    return parseFloat(value) || 100000;
 }
 
 // Initialize on page load
