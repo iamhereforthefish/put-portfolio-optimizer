@@ -155,6 +155,7 @@ function resetWeights() {
 
 /**
  * Optimize the portfolio
+ * Weight flexibility: ±10% from user selection, minimum 1% if user selected any weight
  */
 async function optimizePortfolio() {
     // Validate weights
@@ -170,31 +171,78 @@ async function optimizePortfolio() {
     const targetOTM = parseFloat(document.getElementById('otm-target').value) || 10;
 
     // Show loading
-    showStatus('Optimizing portfolio...', 'loading');
+    showStatus('Fetching option data...', 'loading');
     const optimizeBtn = document.querySelector('.optimize-btn');
     optimizeBtn.disabled = true;
 
     optimizationResults = [];
 
     try {
-        // Process each ETF with non-zero weight
+        // Step 1: Get yield data for all ETFs with non-zero user weight
+        const etfYieldData = [];
+
         for (const etf of Object.keys(currentWeights)) {
             if (currentWeights[etf] <= 0) continue;
 
-            const allocation = (currentWeights[etf] / 100) * nominalExposure;
-
             try {
-                const result = await findBestPut(etf, allocation, targetDTE, targetOTM);
-                if (result) {
-                    optimizationResults.push(result);
+                showStatus(`Analyzing ${etf}...`, 'loading');
+                const optionData = await findBestOptionData(etf, targetDTE, targetOTM);
+                if (optionData) {
+                    etfYieldData.push({
+                        etf,
+                        userWeight: currentWeights[etf],
+                        ...optionData
+                    });
                 }
             } catch (error) {
                 console.error(`Error processing ${etf}:`, error);
             }
         }
 
-        if (optimizationResults.length === 0) {
+        if (etfYieldData.length === 0) {
             showStatus('No options found matching criteria', 'error');
+            optimizeBtn.disabled = false;
+            return;
+        }
+
+        // Step 2: Optimize weights to maximize yield
+        showStatus('Optimizing weights...', 'loading');
+        const optimizedWeights = optimizeWeights(etfYieldData);
+
+        // Step 3: Calculate final allocations with optimized weights
+        for (const data of etfYieldData) {
+            const optimizedWeight = optimizedWeights[data.etf];
+            const allocation = (optimizedWeight / 100) * nominalExposure;
+
+            const notionalPerContract = data.strike * 100;
+            const contracts = Math.floor(allocation / notionalPerContract);
+
+            if (contracts < 1) continue;
+
+            const totalNotional = contracts * notionalPerContract;
+            const totalPremium = contracts * data.bid * 100;
+
+            optimizationResults.push({
+                etf: data.etf,
+                weight: optimizedWeight,
+                userWeight: data.userWeight,
+                stockPrice: data.stockPrice,
+                strike: data.strike,
+                expiration: data.expiration,
+                dte: data.dte,
+                bid: data.bid,
+                ask: data.ask,
+                contracts,
+                premium: totalPremium,
+                notional: totalNotional,
+                annualizedYield: data.annualizedYield,
+                actualOTM: data.actualOTM,
+                optionSymbol: data.optionSymbol
+            });
+        }
+
+        if (optimizationResults.length === 0) {
+            showStatus('No valid trades found (allocations too small)', 'error');
             optimizeBtn.disabled = false;
             return;
         }
@@ -212,11 +260,73 @@ async function optimizePortfolio() {
 }
 
 /**
- * Find the best put option for an ETF
- * Searches expirations within range: (targetDTE - 20 days) to (targetDTE + 35 days)
- * Picks the option with highest annualized yield
+ * Optimize weights to maximize portfolio yield
+ * Constraints: ±10% from user weight, minimum 1% for any selected ETF
  */
-async function findBestPut(etf, allocation, targetDTE, targetOTM) {
+function optimizeWeights(etfYieldData) {
+    // Calculate weight bounds for each ETF
+    const bounds = {};
+    for (const data of etfYieldData) {
+        const userWeight = data.userWeight;
+        // Min: at least 1% if user selected any weight, or userWeight - 10 (whichever is higher)
+        const minWeight = Math.max(1, userWeight - 10);
+        // Max: userWeight + 10, but not more than 100
+        const maxWeight = Math.min(100, userWeight + 10);
+        bounds[data.etf] = { min: minWeight, max: maxWeight, yield: data.annualizedYield };
+    }
+
+    // Start with minimum weights
+    const optimizedWeights = {};
+    let totalAllocated = 0;
+
+    for (const data of etfYieldData) {
+        optimizedWeights[data.etf] = bounds[data.etf].min;
+        totalAllocated += bounds[data.etf].min;
+    }
+
+    // Calculate remaining weight to distribute
+    let remaining = 100 - totalAllocated;
+
+    // Sort ETFs by yield (highest first)
+    const sortedETFs = [...etfYieldData].sort((a, b) => b.annualizedYield - a.annualizedYield);
+
+    // Distribute remaining weight to highest yielding ETFs first
+    for (const data of sortedETFs) {
+        if (remaining <= 0) break;
+
+        const etf = data.etf;
+        const currentWeight = optimizedWeights[etf];
+        const maxWeight = bounds[etf].max;
+        const canAdd = maxWeight - currentWeight;
+
+        if (canAdd > 0) {
+            const toAdd = Math.min(canAdd, remaining);
+            optimizedWeights[etf] += toAdd;
+            remaining -= toAdd;
+        }
+    }
+
+    // If still remaining (shouldn't happen if bounds are valid), distribute evenly
+    if (remaining > 0.1) {
+        const perETF = remaining / etfYieldData.length;
+        for (const data of etfYieldData) {
+            optimizedWeights[data.etf] += perETF;
+        }
+    }
+
+    // Round to 1 decimal place
+    for (const etf of Object.keys(optimizedWeights)) {
+        optimizedWeights[etf] = Math.round(optimizedWeights[etf] * 10) / 10;
+    }
+
+    return optimizedWeights;
+}
+
+/**
+ * Find the best option data for an ETF (without calculating contracts)
+ * Returns yield and option details for weight optimization
+ */
+async function findBestOptionData(etf, targetDTE, targetOTM) {
     // Get stock price
     const stockData = await fetchStockQuote(etf);
     if (!stockData || !stockData.price) return null;
@@ -269,33 +379,21 @@ async function findBestPut(etf, allocation, targetDTE, targetOTM) {
 
         // Calculate metrics for this option
         const dte = calculateDaysToExpiry(expiration);
-        const notionalPerContract = closestOption.strike * 100;
-        const contracts = Math.floor(allocation / notionalPerContract);
-
-        if (contracts < 1) continue;
-
         const periodYield = closestOption.bid / stockData.price;
         const annualizedYield = periodYield * (365 / dte);
 
         // Keep track of the highest yielding option
         if (annualizedYield > bestYield) {
             bestYield = annualizedYield;
-            const totalNotional = contracts * notionalPerContract;
-            const totalPremium = contracts * closestOption.bid * 100;
             const actualOTM = ((stockData.price - closestOption.strike) / stockData.price) * 100;
 
             bestResult = {
-                etf,
-                weight: currentWeights[etf],
                 stockPrice: stockData.price,
                 strike: closestOption.strike,
                 expiration,
                 dte,
                 bid: closestOption.bid,
                 ask: closestOption.ask,
-                contracts,
-                premium: totalPremium,
-                notional: totalNotional,
                 annualizedYield,
                 actualOTM,
                 optionSymbol: closestOption.symbol
@@ -407,10 +505,15 @@ function displayResults(nominalExposure, targetDTE, targetOTM) {
 
     // Build trades table
     const tbody = document.getElementById('trades-body');
-    tbody.innerHTML = optimizationResults.map(r => `
+    tbody.innerHTML = optimizationResults.map(r => {
+        const weightDiff = r.weight - r.userWeight;
+        const weightDisplay = weightDiff !== 0
+            ? `${r.weight}% <span class="weight-diff">(${weightDiff > 0 ? '+' : ''}${weightDiff.toFixed(1)})</span>`
+            : `${r.weight}%`;
+        return `
         <tr>
             <td class="etf">${r.etf}</td>
-            <td>${r.weight}%</td>
+            <td>${weightDisplay}</td>
             <td>$${r.strike.toFixed(2)}</td>
             <td>${formatDate(r.expiration)}</td>
             <td>${r.dte}</td>
@@ -420,7 +523,7 @@ function displayResults(nominalExposure, targetDTE, targetOTM) {
             <td>${formatCurrency(r.notional)}</td>
             <td class="yield">${(r.annualizedYield * 100).toFixed(1)}%</td>
         </tr>
-    `).join('');
+    `}).join('');
 
     // Scroll to results
     resultsSection.scrollIntoView({ behavior: 'smooth' });
@@ -468,6 +571,10 @@ Total Notional:      ${formatCurrency(totalNotional)}
 `;
 
     optimizationResults.forEach((r, idx) => {
+        const weightDiff = r.weight - r.userWeight;
+        const weightNote = weightDiff !== 0
+            ? ` (optimized from ${r.userWeight}%, ${weightDiff > 0 ? '+' : ''}${weightDiff.toFixed(1)}%)`
+            : '';
         orderText += `
 Trade ${idx + 1}: ${r.etf}
 ─────────────────────────────────────────────────────────────────
@@ -483,7 +590,7 @@ Premium:         ${formatCurrency(r.premium)}
 Notional:        ${formatCurrency(r.notional)}
 Ann. Yield:      ${(r.annualizedYield * 100).toFixed(2)}%
 OCC Symbol:      ${r.optionSymbol || 'N/A'}
-Weight:          ${r.weight}%
+Weight:          ${r.weight}%${weightNote}
 
 `;
     });

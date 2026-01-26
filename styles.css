@@ -463,6 +463,12 @@ section h2 {
     color: var(--text-primary);
 }
 
+.weight-diff {
+    font-size: 0.75rem;
+    color: var(--success);
+    font-weight: 600;
+}
+
 .no-results {
     text-align: center;
     color: var(--text-secondary);
