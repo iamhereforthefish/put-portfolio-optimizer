@@ -246,6 +246,9 @@ async function optimizePortfolio() {
                 dte: data.dte,
                 bid: data.bid,
                 ask: data.ask,
+                mid: (data.bid + data.ask) / 2,
+                volume: data.volume,
+                openInterest: data.openInterest,
                 contracts,
                 premium: totalPremium,
                 notional: totalNotional,
@@ -412,6 +415,8 @@ async function findBestOptionData(etf, targetDTE, targetOTM) {
                 dte,
                 bid: closestOption.bid,
                 ask: closestOption.ask,
+                volume: closestOption.volume,
+                openInterest: closestOption.openInterest,
                 annualizedYield,
                 actualOTM,
                 optionSymbol: closestOption.symbol
@@ -476,7 +481,9 @@ async function fetchOptionChain(ticker, expiration, side) {
             symbol: data.optionSymbol?.[i],
             strike: data.strike[i],
             bid: data.bid?.[i] || 0,
-            ask: data.ask?.[i] || 0
+            ask: data.ask?.[i] || 0,
+            volume: data.volume?.[i] || 0,
+            openInterest: data.openInterest?.[i] || 0
         });
     }
 
@@ -739,6 +746,10 @@ function displayResults(nominalExposure, targetDTE, targetOTM) {
             <td>${formatDate(r.expiration)}</td>
             <td>${r.dte}</td>
             <td>$${r.bid.toFixed(2)}</td>
+            <td>$${r.ask.toFixed(2)}</td>
+            <td>$${r.mid.toFixed(2)}</td>
+            <td>${r.openInterest.toLocaleString()}</td>
+            <td>${r.volume.toLocaleString()}</td>
             <td class="contracts">${r.contracts}</td>
             <td>${formatCurrency(r.premium)}</td>
             <td>${formatCurrency(r.notional)}</td>
@@ -797,18 +808,24 @@ Portfolio Beta:      ${portfolioBeta !== null ? portfolioBeta.toFixed(2) : 'N/A'
         const weightNote = weightDiff !== 0
             ? ` (optimized from ${r.userWeight}%, ${weightDiff > 0 ? '+' : ''}${weightDiff.toFixed(1)}%)`
             : '';
+        const limitPremium = r.contracts * r.mid * 100;
         orderText += `
 Trade ${idx + 1}: ${r.etf}
 ─────────────────────────────────────────────────────────────────
-Action:          SELL TO OPEN
+Action:          SELL TO OPEN (LIMIT ORDER)
 Symbol:          ${r.etf}
 Type:            PUT
 Strike:          $${r.strike.toFixed(2)}
 Expiration:      ${formatDate(r.expiration)} (${r.dte} days)
 Contracts:       ${r.contracts}
-Bid Price:       $${r.bid.toFixed(2)}
+Limit Price:     $${r.mid.toFixed(2)} (midpoint)
 ─────────────────────────────────────────────────────────────────
-Premium:         ${formatCurrency(r.premium)}
+Bid:             $${r.bid.toFixed(2)}
+Ask:             $${r.ask.toFixed(2)}
+Open Interest:   ${r.openInterest.toLocaleString()}
+Volume Today:    ${r.volume.toLocaleString()}
+─────────────────────────────────────────────────────────────────
+Est. Premium:    ${formatCurrency(limitPremium)} (at limit)
 Notional:        ${formatCurrency(r.notional)}
 Ann. Yield:      ${(r.annualizedYield * 100).toFixed(2)}%
 OCC Symbol:      ${r.optionSymbol || 'N/A'}
