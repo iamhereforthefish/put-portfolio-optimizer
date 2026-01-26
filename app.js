@@ -935,7 +935,7 @@ function formatExposureInput(input) {
 function getNominalExposure() {
     const input = document.getElementById('nominal-exposure');
     const value = input.value.replace(/,/g, '');
-    return parseFloat(value) || 100000;
+    return parseFloat(value) || 1000000;
 }
 
 // Initialize on page load
