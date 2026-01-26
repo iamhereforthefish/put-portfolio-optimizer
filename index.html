@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Put Portfolio Optimizer</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Put Portfolio Optimizer</h1>
+            <p class="subtitle">Optimize your put-selling portfolio across major ETFs for maximum yield</p>
+        </header>
+
+        <main>
+            <!-- Portfolio Parameters -->
+            <section class="params-section">
+                <h2>Portfolio Parameters</h2>
+
+                <div class="param-row">
+                    <div class="param-group">
+                        <label for="nominal-exposure">Total Nominal Exposure</label>
+                        <div class="input-with-prefix">
+                            <span class="prefix">$</span>
+                            <input type="number" id="nominal-exposure" value="100000" min="1000" step="1000">
+                        </div>
+                        <span class="param-hint">Total capital to allocate across puts</span>
+                    </div>
+
+                    <div class="param-group">
+                        <label for="target-dte">Target Maturity (Days)</label>
+                        <input type="number" id="target-dte" value="30" min="1" max="365">
+                        <span class="param-hint">Average days to expiration</span>
+                    </div>
+
+                    <div class="param-group">
+                        <label for="otm-target">Target OTM %</label>
+                        <div class="input-with-suffix">
+                            <input type="number" id="otm-target" value="10" min="1" max="50">
+                            <span class="suffix">%</span>
+                        </div>
+                        <span class="param-hint">How far out of the money</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ETF Weights -->
+            <section class="weights-section">
+                <h2>ETF Portfolio Weights</h2>
+                <p class="section-hint">Adjust weights to allocate exposure. Total must equal 100%.</p>
+
+                <div class="weights-grid" id="weights-grid">
+                    <!-- Weights will be populated by JavaScript -->
+                </div>
+
+                <div class="weight-total">
+                    <span>Total Weight:</span>
+                    <span id="total-weight" class="total-value">100%</span>
+                </div>
+
+                <div class="weight-actions">
+                    <button class="secondary-btn" onclick="equalizeWeights()">Equalize Weights</button>
+                    <button class="secondary-btn" onclick="resetWeights()">Reset to Default</button>
+                </div>
+            </section>
+
+            <!-- Optimize Button -->
+            <section class="optimize-section">
+                <button class="optimize-btn" onclick="optimizePortfolio()">
+                    <span class="btn-icon">⚡</span> Optimize Portfolio
+                </button>
+                <div id="status-message" class="status-message"></div>
+            </section>
+
+            <!-- Results -->
+            <section class="results-section" id="results-section" style="display: none;">
+                <h2>Optimized Put Portfolio</h2>
+                <p class="results-subtitle">
+                    Target: <span id="result-exposure">$100,000</span> exposure |
+                    <span id="result-dte">30</span> days avg maturity |
+                    <span id="result-otm">10%</span> OTM
+                </p>
+
+                <!-- Portfolio Summary -->
+                <div class="portfolio-summary">
+                    <div class="summary-card primary">
+                        <span class="summary-label">Portfolio Annualized Yield</span>
+                        <span class="summary-value" id="portfolio-yield">--%</span>
+                    </div>
+                    <div class="summary-card">
+                        <span class="summary-label">Total Premium</span>
+                        <span class="summary-value" id="total-premium">--</span>
+                    </div>
+                    <div class="summary-card">
+                        <span class="summary-label">Total Notional</span>
+                        <span class="summary-value" id="total-notional">--</span>
+                    </div>
+                    <div class="summary-card">
+                        <span class="summary-label">Avg Days to Expiry</span>
+                        <span class="summary-value" id="avg-dte">--</span>
+                    </div>
+                </div>
+
+                <!-- Trade Table -->
+                <div class="trades-table-container">
+                    <table class="trades-table">
+                        <thead>
+                            <tr>
+                                <th>ETF</th>
+                                <th>Weight</th>
+                                <th>Strike</th>
+                                <th>Expiration</th>
+                                <th>DTE</th>
+                                <th>Bid</th>
+                                <th>Contracts</th>
+                                <th>Premium</th>
+                                <th>Notional</th>
+                                <th>Ann. Yield</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trades-body">
+                            <tr><td colspan="10" class="no-results">Run optimization to see results</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Copy Button -->
+                <div class="copy-section">
+                    <button class="copy-btn" onclick="copyTradeOrder()">
+                        <span class="copy-icon">📋</span> Copy Trade Order to Clipboard
+                    </button>
+                    <div id="copy-status" class="copy-status"></div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Data from MarketData.app | Put Portfolio Optimizer for Index ETFs</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
