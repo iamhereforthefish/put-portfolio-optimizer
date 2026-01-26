@@ -506,8 +506,16 @@ function calculateDaysToExpiry(expirationDate) {
  * Returns array of closing prices (oldest to newest)
  */
 async function fetchHistoricalPrices(ticker, days = 90) {
-    // Use countback parameter to get last N trading days
-    const url = `${MARKETDATA_API.baseUrl}/stocks/candles/D/${ticker}/?countback=${days}`;
+    // Calculate date range
+    const toDate = new Date();
+    const fromDate = new Date();
+    fromDate.setDate(fromDate.getDate() - days);
+
+    const fromStr = fromDate.toISOString().split('T')[0];
+    const toStr = toDate.toISOString().split('T')[0];
+
+    const url = `${MARKETDATA_API.baseUrl}/stocks/candles/D/${ticker}/?from=${fromStr}&to=${toStr}`;
+    console.log(`Fetching historical data: ${url}`);
 
     try {
         const response = await fetch(url, {
@@ -515,14 +523,19 @@ async function fetchHistoricalPrices(ticker, days = 90) {
         });
 
         if (!response.ok) {
-            console.error(`Historical data API error for ${ticker}: ${response.status}`);
+            console.error(`Historical data API error for ${ticker}: ${response.status} ${response.statusText}`);
+            const text = await response.text();
+            console.error(`Response: ${text}`);
             return null;
         }
 
         const data = await response.json();
         console.log(`Historical data for ${ticker}:`, data.s, data.c ? data.c.length + ' prices' : 'no data');
 
-        if (data.s !== 'ok' || !data.c || data.c.length === 0) return null;
+        if (data.s !== 'ok' || !data.c || data.c.length === 0) {
+            console.error(`Invalid data for ${ticker}:`, data);
+            return null;
+        }
 
         // Return closing prices
         return data.c;
