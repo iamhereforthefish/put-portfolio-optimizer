@@ -28,6 +28,9 @@ let currentWeights = {};
 // Store optimization results
 let optimizationResults = [];
 
+// Store portfolio beta
+let portfolioBeta = null;
+
 /**
  * Initialize the application
  */
@@ -246,6 +249,10 @@ async function optimizePortfolio() {
             optimizeBtn.disabled = false;
             return;
         }
+
+        // Step 4: Calculate portfolio beta
+        showStatus('Calculating portfolio beta...', 'loading');
+        portfolioBeta = await calculatePortfolioBeta(optimizedWeights);
 
         // Display results
         displayResults(nominalExposure, targetDTE, targetOTM);
@@ -477,6 +484,162 @@ function calculateDaysToExpiry(expirationDate) {
 }
 
 /**
+ * Fetch historical candle data for a ticker
+ * Returns array of closing prices (oldest to newest)
+ */
+async function fetchHistoricalPrices(ticker, days = 90) {
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const fromStr = startDate.toISOString().split('T')[0];
+    const toStr = endDate.toISOString().split('T')[0];
+
+    const url = `${MARKETDATA_API.baseUrl}/stocks/candles/D/${ticker}/?from=${fromStr}&to=${toStr}`;
+
+    try {
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Token ${MARKETDATA_API.token}` }
+        });
+
+        if (!response.ok) return null;
+
+        const data = await response.json();
+        if (data.s !== 'ok' || !data.c) return null;
+
+        // Return closing prices
+        return data.c;
+    } catch (error) {
+        console.error(`Error fetching historical data for ${ticker}:`, error);
+        return null;
+    }
+}
+
+/**
+ * Calculate daily returns from prices
+ * Returns array of returns (percentage change)
+ */
+function calculateReturns(prices) {
+    if (!prices || prices.length < 2) return [];
+
+    const returns = [];
+    for (let i = 1; i < prices.length; i++) {
+        const dailyReturn = (prices[i] - prices[i - 1]) / prices[i - 1];
+        returns.push(dailyReturn);
+    }
+    return returns;
+}
+
+/**
+ * Calculate covariance between two arrays
+ */
+function calculateCovariance(arr1, arr2) {
+    if (arr1.length !== arr2.length || arr1.length === 0) return 0;
+
+    const n = arr1.length;
+    const mean1 = arr1.reduce((sum, x) => sum + x, 0) / n;
+    const mean2 = arr2.reduce((sum, x) => sum + x, 0) / n;
+
+    let covariance = 0;
+    for (let i = 0; i < n; i++) {
+        covariance += (arr1[i] - mean1) * (arr2[i] - mean2);
+    }
+
+    return covariance / (n - 1); // Sample covariance
+}
+
+/**
+ * Calculate variance of an array
+ */
+function calculateVariance(arr) {
+    if (arr.length === 0) return 0;
+
+    const n = arr.length;
+    const mean = arr.reduce((sum, x) => sum + x, 0) / n;
+
+    let variance = 0;
+    for (let i = 0; i < n; i++) {
+        variance += Math.pow(arr[i] - mean, 2);
+    }
+
+    return variance / (n - 1); // Sample variance
+}
+
+/**
+ * Calculate portfolio beta to S&P 500
+ * β_p = Cov(R_p, R_m) / Var(R_m)
+ */
+async function calculatePortfolioBeta(optimizedWeights) {
+    try {
+        // Fetch SPY (market) historical prices
+        const spyPrices = await fetchHistoricalPrices('SPY', 90);
+        if (!spyPrices || spyPrices.length < 10) {
+            console.error('Could not fetch SPY historical data');
+            return null;
+        }
+
+        const marketReturns = calculateReturns(spyPrices);
+        if (marketReturns.length === 0) return null;
+
+        // Fetch historical prices for each ETF in the portfolio
+        const etfReturnsMap = {};
+        const activeETFs = Object.keys(optimizedWeights).filter(etf => optimizedWeights[etf] > 0);
+
+        for (const etf of activeETFs) {
+            const prices = await fetchHistoricalPrices(etf, 90);
+            if (prices && prices.length >= 10) {
+                etfReturnsMap[etf] = calculateReturns(prices);
+            }
+        }
+
+        // Find the minimum length across all return series (to align dates)
+        let minLength = marketReturns.length;
+        for (const etf of Object.keys(etfReturnsMap)) {
+            minLength = Math.min(minLength, etfReturnsMap[etf].length);
+        }
+
+        if (minLength < 5) return null;
+
+        // Trim all return series to the same length (most recent data)
+        const trimmedMarketReturns = marketReturns.slice(-minLength);
+
+        // Calculate weighted portfolio returns
+        const portfolioReturns = [];
+        for (let i = 0; i < minLength; i++) {
+            let dayReturn = 0;
+            let totalWeight = 0;
+
+            for (const etf of Object.keys(etfReturnsMap)) {
+                const weight = optimizedWeights[etf] / 100;
+                const etfReturns = etfReturnsMap[etf].slice(-minLength);
+                dayReturn += weight * etfReturns[i];
+                totalWeight += weight;
+            }
+
+            // Normalize by total weight (in case some ETFs were missing)
+            if (totalWeight > 0) {
+                portfolioReturns.push(dayReturn / totalWeight);
+            }
+        }
+
+        if (portfolioReturns.length < 5) return null;
+
+        // Calculate beta: Cov(R_p, R_m) / Var(R_m)
+        const covariance = calculateCovariance(portfolioReturns, trimmedMarketReturns);
+        const marketVariance = calculateVariance(trimmedMarketReturns);
+
+        if (marketVariance === 0) return null;
+
+        const beta = covariance / marketVariance;
+        return beta;
+
+    } catch (error) {
+        console.error('Error calculating portfolio beta:', error);
+        return null;
+    }
+}
+
+/**
  * Display optimization results
  */
 function displayResults(nominalExposure, targetDTE, targetOTM) {
@@ -502,6 +665,16 @@ function displayResults(nominalExposure, targetDTE, targetOTM) {
     document.getElementById('total-premium').textContent = formatCurrency(totalPremium);
     document.getElementById('total-notional').textContent = formatCurrency(totalNotional);
     document.getElementById('avg-dte').textContent = Math.round(avgDTE) + ' days';
+
+    // Update portfolio beta
+    const betaEl = document.getElementById('portfolio-beta');
+    if (betaEl) {
+        if (portfolioBeta !== null) {
+            betaEl.textContent = portfolioBeta.toFixed(2);
+        } else {
+            betaEl.textContent = 'N/A';
+        }
+    }
 
     // Build trades table
     const tbody = document.getElementById('trades-body');
@@ -563,6 +736,7 @@ Portfolio Summary:
 Annualized Yield:    ${(portfolioYield * 100).toFixed(2)}%
 Total Premium:       ${formatCurrency(totalPremium)}
 Total Notional:      ${formatCurrency(totalNotional)}
+Portfolio Beta:      ${portfolioBeta !== null ? portfolioBeta.toFixed(2) : 'N/A'}
 
 ═══════════════════════════════════════════════════════════════
                          TRADE DETAILS
