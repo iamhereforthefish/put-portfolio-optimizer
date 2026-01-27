@@ -11,16 +11,16 @@ const MARKETDATA_API = {
 
 // ETF Universe with default weights
 const ETF_DATA = {
-    'SPY': { name: 'S&P 500 ETF', weight: 20 },
-    'QQQ': { name: 'Nasdaq-100 ETF', weight: 15 },
-    'IWM': { name: 'Russell 2000 ETF', weight: 10 },
-    'EFA': { name: 'EAFE International', weight: 10 },
-    'EEM': { name: 'Emerging Markets', weight: 10 },
-    'GLD': { name: 'Gold ETF', weight: 10 },
-    'SLV': { name: 'Silver ETF', weight: 10 },
-    'GDX': { name: 'Gold Miners ETF', weight: 10 },
-    'XME': { name: 'Metals & Mining ETF', weight: 0 },
-    'COPX': { name: 'Copper Miners ETF', weight: 0 },
+    'SPY': { name: 'S&P 500 ETF', weight: 18 },
+    'QQQ': { name: 'Nasdaq-100 ETF', weight: 13 },
+    'IWM': { name: 'Russell 2000 ETF', weight: 9 },
+    'EFA': { name: 'EAFE International', weight: 9 },
+    'EEM': { name: 'Emerging Markets', weight: 9 },
+    'GLD': { name: 'Gold ETF', weight: 9 },
+    'SLV': { name: 'Silver ETF', weight: 9 },
+    'GDX': { name: 'Gold Miners ETF', weight: 9 },
+    'XME': { name: 'Metals & Mining ETF', weight: 5 },
+    'COPX': { name: 'Copper Miners ETF', weight: 5 },
     'IBIT': { name: 'Bitcoin ETF', weight: 5 }
 };
 
