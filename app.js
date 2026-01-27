@@ -1006,7 +1006,7 @@ Weight:          ${r.weight}%${weightNote}
 }
 
 /**
- * Download trades as CSV file
+ * Download trades as Excel file with styled headers
  */
 function downloadCSV() {
     if (optimizationResults.length === 0) {
@@ -1014,7 +1014,7 @@ function downloadCSV() {
         return;
     }
 
-    // CSV Headers (Column I is skipped per user request)
+    // Headers
     const headers = [
         'Instructions',
         'Quantity',
@@ -1024,46 +1024,66 @@ function downloadCSV() {
         'Maturity Date',
         'Order Limit Price',
         'Trade Detail',
-        '',  // Empty column I
         'Option Contract Ticker'
     ];
 
-    // Build CSV rows
-    const rows = [headers.join(',')];
+    // Build data rows
+    const data = [headers];
 
     optimizationResults.forEach(r => {
         const row = [
             'Sell to Open',
             r.contracts,
             r.etf,
-            r.strike.toFixed(2),
+            '$' + r.strike.toFixed(2),
             'PUT',
             r.expiration,
-            r.mid.toFixed(2),
+            '$' + r.mid.toFixed(2),
             'Good til Cancelled',
-            '',  // Empty column I
             r.optionSymbol || ''
         ];
-        rows.push(row.join(','));
+        data.push(row);
     });
 
-    // Create CSV content
-    const csvContent = rows.join('\n');
+    // Create workbook and worksheet
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(data);
 
-    // Create and trigger download
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
+    // Set column widths
+    ws['!cols'] = [
+        { wch: 15 },  // Instructions
+        { wch: 10 },  // Quantity
+        { wch: 18 },  // Underlying Ticker
+        { wch: 12 },  // Strike Price
+        { wch: 12 },  // Option Type
+        { wch: 14 },  // Maturity Date
+        { wch: 16 },  // Order Limit Price
+        { wch: 18 },  // Trade Detail
+        { wch: 22 }   // Option Contract Ticker
+    ];
 
-    link.setAttribute('href', url);
-    link.setAttribute('download', `put_portfolio_trades_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
+    // Apply header styling (dark background #0F2A36, white bold text)
+    const headerStyle = {
+        fill: { fgColor: { rgb: "0F2A36" } },
+        font: { bold: true, color: { rgb: "FFFFFF" } },
+        alignment: { horizontal: "center" }
+    };
 
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Apply styles to header row (row 1)
+    for (let col = 0; col < headers.length; col++) {
+        const cellRef = XLSX.utils.encode_cell({ r: 0, c: col });
+        if (!ws[cellRef]) ws[cellRef] = {};
+        ws[cellRef].s = headerStyle;
+    }
 
-    showCopyStatus('CSV file downloaded!', 'success');
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(wb, ws, 'Trades');
+
+    // Generate and download file
+    const fileName = `put_portfolio_trades_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+
+    showCopyStatus('Excel file downloaded!', 'success');
 }
 
 /**
