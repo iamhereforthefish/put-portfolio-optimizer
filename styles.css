@@ -216,11 +216,31 @@ section h2 {
     flex-direction: column;
     gap: 0.5rem;
     border: 2px solid transparent;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, opacity 0.2s, background 0.2s;
+    position: relative;
 }
 
 .weight-card:hover {
     border-color: var(--primary);
+}
+
+.weight-card.excluded {
+    background: rgba(200, 200, 200, 0.6);
+    opacity: 0.7;
+}
+
+.weight-card.excluded:hover {
+    border-color: #999;
+}
+
+.etf-include-checkbox {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: var(--primary);
 }
 
 .weight-card-header {
