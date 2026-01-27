@@ -140,11 +140,16 @@
                     </table>
                 </div>
 
-                <!-- Copy Button -->
+                <!-- Copy/Download Buttons -->
                 <div class="copy-section">
-                    <button class="copy-btn" onclick="copyTradeOrder()">
-                        <span class="copy-icon">📋</span> Copy Trade Order to Clipboard
-                    </button>
+                    <div class="button-row">
+                        <button class="copy-btn" onclick="copyTradeOrder()">
+                            <span class="copy-icon">📋</span> Copy Trade Order to Clipboard
+                        </button>
+                        <button class="csv-btn" onclick="downloadCSV()">
+                            <span class="csv-icon">📥</span> Download CSV
+                        </button>
+                    </div>
                     <div id="copy-status" class="copy-status"></div>
                 </div>
             </section>
@@ -155,6 +160,6 @@
         </footer>
     </div>
 
-    <script src="app.js?v=10"></script>
+    <script src="app.js?v=11"></script>
 </body>
 </html>

@@ -1006,6 +1006,67 @@ Weight:          ${r.weight}%${weightNote}
 }
 
 /**
+ * Download trades as CSV file
+ */
+function downloadCSV() {
+    if (optimizationResults.length === 0) {
+        showCopyStatus('No trades to download', 'error');
+        return;
+    }
+
+    // CSV Headers (Column I is skipped per user request)
+    const headers = [
+        'Instructions',
+        'Quantity',
+        'Underlying Ticker',
+        'Strike Price',
+        'Option Type',
+        'Maturity Date',
+        'Order Limit Price',
+        'Trade Detail',
+        '',  // Empty column I
+        'Option Contract Ticker'
+    ];
+
+    // Build CSV rows
+    const rows = [headers.join(',')];
+
+    optimizationResults.forEach(r => {
+        const row = [
+            'Sell to Open',
+            r.contracts,
+            r.etf,
+            r.strike.toFixed(2),
+            'PUT',
+            r.expiration,
+            r.mid.toFixed(2),
+            'Good til Cancelled',
+            '',  // Empty column I
+            r.optionSymbol || ''
+        ];
+        rows.push(row.join(','));
+    });
+
+    // Create CSV content
+    const csvContent = rows.join('\n');
+
+    // Create and trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', `put_portfolio_trades_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showCopyStatus('CSV file downloaded!', 'success');
+}
+
+/**
  * Show status message
  */
 function showStatus(message, type) {
