@@ -1008,7 +1008,7 @@ Weight:          ${r.weight}%${weightNote}
 /**
  * Download trades as Excel file with styled headers
  */
-function downloadCSV() {
+async function downloadCSV() {
     if (optimizationResults.length === 0) {
         showCopyStatus('No trades to download', 'error');
         return;
@@ -1027,11 +1027,33 @@ function downloadCSV() {
         'Option Contract Ticker'
     ];
 
-    // Build data rows
-    const data = [headers];
+    // Create workbook and worksheet using ExcelJS
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Trades');
 
+    // Add header row
+    const headerRow = worksheet.addRow(headers);
+
+    // Style header row: dark background #0F2A36, white bold text
+    headerRow.eachCell((cell) => {
+        cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FF0F2A36' }
+        };
+        cell.font = {
+            bold: true,
+            color: { argb: 'FFFFFFFF' }
+        };
+        cell.alignment = {
+            horizontal: 'center',
+            vertical: 'middle'
+        };
+    });
+
+    // Add data rows
     optimizationResults.forEach(r => {
-        const row = [
+        worksheet.addRow([
             'Sell to Open',
             r.contracts,
             r.etf,
@@ -1041,49 +1063,39 @@ function downloadCSV() {
             '$' + r.mid.toFixed(2),
             'Good til Cancelled',
             r.optionSymbol || ''
-        ];
-        data.push(row);
+        ]);
     });
 
-    // Create workbook and worksheet
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(data);
-
     // Set column widths
-    ws['!cols'] = [
-        { wch: 15 },  // Instructions
-        { wch: 10 },  // Quantity
-        { wch: 18 },  // Underlying Ticker
-        { wch: 12 },  // Strike Price
-        { wch: 12 },  // Option Type
-        { wch: 14 },  // Maturity Date
-        { wch: 16 },  // Order Limit Price
-        { wch: 18 },  // Trade Detail
-        { wch: 22 }   // Option Contract Ticker
+    worksheet.columns = [
+        { width: 15 },  // Instructions
+        { width: 10 },  // Quantity
+        { width: 18 },  // Underlying Ticker
+        { width: 14 },  // Strike Price
+        { width: 12 },  // Option Type
+        { width: 14 },  // Maturity Date
+        { width: 18 },  // Order Limit Price
+        { width: 20 },  // Trade Detail
+        { width: 24 }   // Option Contract Ticker
     ];
 
-    // Apply header styling (dark background #0F2A36, white bold text)
-    const headerStyle = {
-        fill: { fgColor: { rgb: "0F2A36" } },
-        font: { bold: true, color: { rgb: "FFFFFF" } },
-        alignment: { horizontal: "center" }
-    };
-
-    // Apply styles to header row (row 1)
-    for (let col = 0; col < headers.length; col++) {
-        const cellRef = XLSX.utils.encode_cell({ r: 0, c: col });
-        if (!ws[cellRef]) ws[cellRef] = {};
-        ws[cellRef].s = headerStyle;
-    }
-
-    // Add worksheet to workbook
-    XLSX.utils.book_append_sheet(wb, ws, 'Trades');
-
-    // Generate and download file
+    // Generate file and download
     const fileName = `put_portfolio_trades_${new Date().toISOString().split('T')[0]}.xlsx`;
-    XLSX.writeFile(wb, fileName);
 
-    showCopyStatus('Excel file downloaded!', 'success');
+    try {
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        window.URL.revokeObjectURL(url);
+        showCopyStatus('Excel file downloaded!', 'success');
+    } catch (error) {
+        console.error('Error creating Excel file:', error);
+        showCopyStatus('Failed to create Excel file', 'error');
+    }
 }
 
 /**
