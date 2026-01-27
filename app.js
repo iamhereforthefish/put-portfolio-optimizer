@@ -19,6 +19,8 @@ const ETF_DATA = {
     'GLD': { name: 'Gold ETF', weight: 10 },
     'SLV': { name: 'Silver ETF', weight: 10 },
     'GDX': { name: 'Gold Miners ETF', weight: 10 },
+    'XME': { name: 'Metals & Mining ETF', weight: 0 },
+    'COPX': { name: 'Copper Miners ETF', weight: 0 },
     'IBIT': { name: 'Bitcoin ETF', weight: 5 }
 };
 
