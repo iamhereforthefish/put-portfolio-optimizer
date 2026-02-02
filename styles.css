@@ -320,18 +320,9 @@ section h2 {
     }
 }
 
-.custom-ticker-card {
-    border: 2px dashed var(--border);
-}
-
-.custom-ticker-card:hover {
-    border-color: var(--primary);
-    border-style: dashed;
-}
-
-.custom-ticker-card.active {
-    border-style: solid;
-    border-color: var(--primary);
+.custom-ticker-card.excluded {
+    background: rgba(200, 200, 200, 0.6);
+    opacity: 0.7;
 }
 
 .custom-ticker-input-row {

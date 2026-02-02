@@ -133,8 +133,7 @@ function toggleETFInclusion(etf, included) {
 }
 
 /**
- * Equalize weights among included ETFs only
- * Accounts for custom ticker weights when distributing
+ * Equalize weights among all included items (ETFs + custom tickers)
  */
 function equalizeIncludedWeights() {
     // Get all included ETFs
@@ -143,46 +142,66 @@ function equalizeIncludedWeights() {
         return checkbox && checkbox.checked;
     });
 
-    // Calculate total weight already allocated to custom tickers
-    let customTickerWeight = 0;
+    // Get all included custom tickers
+    const includedCustom = [];
     for (let i = 1; i <= 3; i++) {
         if (customTickers[i].enabled) {
-            customTickerWeight += customTickers[i].weight;
+            includedCustom.push(i);
         }
     }
 
-    // Available weight for ETFs
-    const availableWeight = 100 - customTickerWeight;
+    // Total included items
+    const totalIncluded = includedETFs.length + includedCustom.length;
 
-    if (includedETFs.length === 0) {
-        // No ETFs selected, set all to 0
+    if (totalIncluded === 0) {
+        // Nothing selected, set all to 0
         Object.keys(ETF_DATA).forEach(etf => {
             currentWeights[etf] = 0;
             document.getElementById(`weight-${etf}`).value = 0;
             document.getElementById(`slider-${etf}`).value = 0;
         });
+        for (let i = 1; i <= 3; i++) {
+            customTickers[i].weight = 0;
+            document.getElementById(`weight-custom-${i}`).value = 0;
+            document.getElementById(`slider-custom-${i}`).value = 0;
+        }
     } else {
-        // Calculate equal weight from available
-        const equalWeight = Math.floor(availableWeight / includedETFs.length);
-        const remainder = availableWeight - (equalWeight * includedETFs.length);
+        // Calculate equal weight
+        const equalWeight = Math.floor(100 / totalIncluded);
+        const remainder = 100 - (equalWeight * totalIncluded);
 
-        // Set excluded ETFs to 0
+        let idx = 0;
+
+        // Set excluded ETFs to 0, included ETFs to equal weight
         Object.keys(ETF_DATA).forEach(etf => {
             const checkbox = document.getElementById(`include-${etf}`);
             if (!checkbox || !checkbox.checked) {
                 currentWeights[etf] = 0;
                 document.getElementById(`weight-${etf}`).value = 0;
                 document.getElementById(`slider-${etf}`).value = 0;
+            } else {
+                const weight = equalWeight + (idx < remainder ? 1 : 0);
+                currentWeights[etf] = weight;
+                document.getElementById(`weight-${etf}`).value = weight;
+                document.getElementById(`slider-${etf}`).value = weight;
+                idx++;
             }
         });
 
-        // Distribute weight among included ETFs
-        includedETFs.forEach((etf, idx) => {
-            const weight = equalWeight + (idx < remainder ? 1 : 0);
-            currentWeights[etf] = weight;
-            document.getElementById(`weight-${etf}`).value = weight;
-            document.getElementById(`slider-${etf}`).value = weight;
-        });
+        // Set excluded custom tickers to 0, included to equal weight
+        for (let i = 1; i <= 3; i++) {
+            if (!customTickers[i].enabled) {
+                customTickers[i].weight = 0;
+                document.getElementById(`weight-custom-${i}`).value = 0;
+                document.getElementById(`slider-custom-${i}`).value = 0;
+            } else {
+                const weight = equalWeight + (idx < remainder ? 1 : 0);
+                customTickers[i].weight = weight;
+                document.getElementById(`weight-custom-${i}`).value = weight;
+                document.getElementById(`slider-custom-${i}`).value = weight;
+                idx++;
+            }
+        }
     }
 
     updateTotalWeight();
@@ -281,30 +300,22 @@ function toggleCustomTicker(index, enabled) {
     const card = document.getElementById(`card-custom-${index}`);
     const weightInput = document.getElementById(`weight-custom-${index}`);
     const slider = document.getElementById(`slider-custom-${index}`);
-    const tickerInput = document.getElementById(`ticker-custom-${index}`);
 
     customTickers[index].enabled = enabled;
 
     if (enabled) {
-        card.classList.add('active');
+        card.classList.remove('excluded');
         weightInput.disabled = false;
         slider.disabled = false;
-        // If no weight set, give it a default of 5%
-        if (customTickers[index].weight === 0) {
-            customTickers[index].weight = 5;
-            weightInput.value = 5;
-            slider.value = 5;
-        }
     } else {
-        card.classList.remove('active');
+        card.classList.add('excluded');
         weightInput.disabled = true;
         slider.disabled = true;
         customTickers[index].weight = 0;
-        weightInput.value = 0;
-        slider.value = 0;
     }
 
-    updateTotalWeight();
+    // Equalize weights among all included items (same as ETFs)
+    equalizeIncludedWeights();
 }
 
 /**

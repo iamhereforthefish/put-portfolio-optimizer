@@ -69,7 +69,7 @@
 
                 <div class="custom-tickers-grid" id="custom-tickers-grid">
                     <!-- Custom Ticker 1 -->
-                    <div class="weight-card custom-ticker-card" id="card-custom-1">
+                    <div class="weight-card custom-ticker-card excluded" id="card-custom-1">
                         <input type="checkbox" class="etf-include-checkbox" id="include-custom-1" onchange="toggleCustomTicker(1, this.checked)">
                         <div class="custom-ticker-input-row">
                             <input type="text" class="ticker-input" id="ticker-custom-1" placeholder="TICKER" maxlength="5" oninput="this.value = this.value.toUpperCase()">
@@ -83,7 +83,7 @@
                     </div>
 
                     <!-- Custom Ticker 2 -->
-                    <div class="weight-card custom-ticker-card" id="card-custom-2">
+                    <div class="weight-card custom-ticker-card excluded" id="card-custom-2">
                         <input type="checkbox" class="etf-include-checkbox" id="include-custom-2" onchange="toggleCustomTicker(2, this.checked)">
                         <div class="custom-ticker-input-row">
                             <input type="text" class="ticker-input" id="ticker-custom-2" placeholder="TICKER" maxlength="5" oninput="this.value = this.value.toUpperCase()">
@@ -97,14 +97,14 @@
                     </div>
 
                     <!-- Custom Ticker 3 -->
-                    <div class="weight-card custom-ticker-card" id="card-custom-3">
+                    <div class="weight-card custom-ticker-card excluded" id="card-custom-3">
                         <input type="checkbox" class="etf-include-checkbox" id="include-custom-3" onchange="toggleCustomTicker(3, this.checked)">
                         <div class="custom-ticker-input-row">
                             <input type="text" class="ticker-input" id="ticker-custom-3" placeholder="TICKER" maxlength="5" oninput="this.value = this.value.toUpperCase()">
                         </div>
                         <span class="etf-name">Custom Ticker 3</span>
                         <div class="weight-input-group">
-                            <input type="number" id="weight-custom-3" value="0" min="0" max="100" step="1" disabled onchange="updateCustomWeight(3, this.value)" oninput="updateCustomWeight(3, this.value)">
+                            <input type="number" id="weight-custom-3" value="0" min="0" max="100" step="1" disabled onchange="updateCustomWeight(1, this.value)" oninput="updateCustomWeight(3, this.value)">
                             <span>%</span>
                         </div>
                         <input type="range" class="weight-slider" id="slider-custom-3" value="0" min="0" max="100" step="1" disabled onchange="updateCustomWeightFromSlider(3, this.value)" oninput="updateCustomWeightFromSlider(3, this.value)">
@@ -211,6 +211,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-    <script src="app.js?v=16"></script>
+    <script src="app.js?v=17"></script>
 </body>
 </html>
