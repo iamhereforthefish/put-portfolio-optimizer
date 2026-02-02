@@ -61,6 +61,56 @@
                     <!-- Weights will be populated by JavaScript -->
                 </div>
 
+                <!-- Custom Tickers Section -->
+                <div class="custom-tickers-header">
+                    <h3>Custom Tickers</h3>
+                    <p class="section-hint">Add up to 3 custom stock tickers to include in the optimization</p>
+                </div>
+
+                <div class="custom-tickers-grid" id="custom-tickers-grid">
+                    <!-- Custom Ticker 1 -->
+                    <div class="weight-card custom-ticker-card" id="card-custom-1">
+                        <input type="checkbox" class="etf-include-checkbox" id="include-custom-1" onchange="toggleCustomTicker(1, this.checked)">
+                        <div class="custom-ticker-input-row">
+                            <input type="text" class="ticker-input" id="ticker-custom-1" placeholder="TICKER" maxlength="5" oninput="this.value = this.value.toUpperCase()">
+                        </div>
+                        <span class="etf-name">Custom Ticker 1</span>
+                        <div class="weight-input-group">
+                            <input type="number" id="weight-custom-1" value="0" min="0" max="100" step="1" disabled onchange="updateCustomWeight(1, this.value)" oninput="updateCustomWeight(1, this.value)">
+                            <span>%</span>
+                        </div>
+                        <input type="range" class="weight-slider" id="slider-custom-1" value="0" min="0" max="100" step="1" disabled onchange="updateCustomWeightFromSlider(1, this.value)" oninput="updateCustomWeightFromSlider(1, this.value)">
+                    </div>
+
+                    <!-- Custom Ticker 2 -->
+                    <div class="weight-card custom-ticker-card" id="card-custom-2">
+                        <input type="checkbox" class="etf-include-checkbox" id="include-custom-2" onchange="toggleCustomTicker(2, this.checked)">
+                        <div class="custom-ticker-input-row">
+                            <input type="text" class="ticker-input" id="ticker-custom-2" placeholder="TICKER" maxlength="5" oninput="this.value = this.value.toUpperCase()">
+                        </div>
+                        <span class="etf-name">Custom Ticker 2</span>
+                        <div class="weight-input-group">
+                            <input type="number" id="weight-custom-2" value="0" min="0" max="100" step="1" disabled onchange="updateCustomWeight(2, this.value)" oninput="updateCustomWeight(2, this.value)">
+                            <span>%</span>
+                        </div>
+                        <input type="range" class="weight-slider" id="slider-custom-2" value="0" min="0" max="100" step="1" disabled onchange="updateCustomWeightFromSlider(2, this.value)" oninput="updateCustomWeightFromSlider(2, this.value)">
+                    </div>
+
+                    <!-- Custom Ticker 3 -->
+                    <div class="weight-card custom-ticker-card" id="card-custom-3">
+                        <input type="checkbox" class="etf-include-checkbox" id="include-custom-3" onchange="toggleCustomTicker(3, this.checked)">
+                        <div class="custom-ticker-input-row">
+                            <input type="text" class="ticker-input" id="ticker-custom-3" placeholder="TICKER" maxlength="5" oninput="this.value = this.value.toUpperCase()">
+                        </div>
+                        <span class="etf-name">Custom Ticker 3</span>
+                        <div class="weight-input-group">
+                            <input type="number" id="weight-custom-3" value="0" min="0" max="100" step="1" disabled onchange="updateCustomWeight(3, this.value)" oninput="updateCustomWeight(3, this.value)">
+                            <span>%</span>
+                        </div>
+                        <input type="range" class="weight-slider" id="slider-custom-3" value="0" min="0" max="100" step="1" disabled onchange="updateCustomWeightFromSlider(3, this.value)" oninput="updateCustomWeightFromSlider(3, this.value)">
+                    </div>
+                </div>
+
                 <div class="weight-total">
                     <span>Total Weight:</span>
                     <span id="total-weight" class="total-value">100%</span>
@@ -161,6 +211,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-    <script src="app.js?v=13"></script>
+    <script src="app.js?v=14"></script>
 </body>
 </html>

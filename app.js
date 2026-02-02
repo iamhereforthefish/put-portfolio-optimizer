@@ -27,6 +27,13 @@ const ETF_DATA = {
 // Store current weights
 let currentWeights = {};
 
+// Store custom ticker data
+let customTickers = {
+    1: { ticker: '', weight: 0, enabled: false },
+    2: { ticker: '', weight: 0, enabled: false },
+    3: { ticker: '', weight: 0, enabled: false }
+};
+
 // Store optimization results
 let optimizationResults = [];
 
@@ -191,7 +198,16 @@ function updateWeightFromSlider(etf, value) {
  * Update total weight display
  */
 function updateTotalWeight() {
-    const total = Object.values(currentWeights).reduce((sum, w) => sum + w, 0);
+    // Sum ETF weights
+    let total = Object.values(currentWeights).reduce((sum, w) => sum + w, 0);
+
+    // Add custom ticker weights
+    for (let i = 1; i <= 3; i++) {
+        if (customTickers[i].enabled) {
+            total += customTickers[i].weight;
+        }
+    }
+
     const totalEl = document.getElementById('total-weight');
     totalEl.textContent = `${total.toFixed(1)}%`;
 
@@ -231,6 +247,69 @@ function resetWeights() {
         document.getElementById(`slider-${etf}`).value = currentWeights[etf];
     });
 
+    // Reset custom tickers
+    for (let i = 1; i <= 3; i++) {
+        customTickers[i] = { ticker: '', weight: 0, enabled: false };
+        document.getElementById(`ticker-custom-${i}`).value = '';
+        document.getElementById(`weight-custom-${i}`).value = 0;
+        document.getElementById(`slider-custom-${i}`).value = 0;
+        document.getElementById(`include-custom-${i}`).checked = false;
+        document.getElementById(`weight-custom-${i}`).disabled = true;
+        document.getElementById(`slider-custom-${i}`).disabled = true;
+        document.getElementById(`card-custom-${i}`).classList.remove('active');
+    }
+
+    updateTotalWeight();
+}
+
+/**
+ * Toggle custom ticker inclusion
+ */
+function toggleCustomTicker(index, enabled) {
+    const card = document.getElementById(`card-custom-${index}`);
+    const weightInput = document.getElementById(`weight-custom-${index}`);
+    const slider = document.getElementById(`slider-custom-${index}`);
+    const tickerInput = document.getElementById(`ticker-custom-${index}`);
+
+    customTickers[index].enabled = enabled;
+
+    if (enabled) {
+        card.classList.add('active');
+        weightInput.disabled = false;
+        slider.disabled = false;
+        // If no weight set, give it a default of 5%
+        if (customTickers[index].weight === 0) {
+            customTickers[index].weight = 5;
+            weightInput.value = 5;
+            slider.value = 5;
+        }
+    } else {
+        card.classList.remove('active');
+        weightInput.disabled = true;
+        slider.disabled = true;
+        customTickers[index].weight = 0;
+        weightInput.value = 0;
+        slider.value = 0;
+    }
+
+    updateTotalWeight();
+}
+
+/**
+ * Update custom ticker weight from input
+ */
+function updateCustomWeight(index, value) {
+    customTickers[index].weight = parseFloat(value) || 0;
+    document.getElementById(`slider-custom-${index}`).value = customTickers[index].weight;
+    updateTotalWeight();
+}
+
+/**
+ * Update custom ticker weight from slider
+ */
+function updateCustomWeightFromSlider(index, value) {
+    customTickers[index].weight = parseFloat(value) || 0;
+    document.getElementById(`weight-custom-${index}`).value = customTickers[index].weight;
     updateTotalWeight();
 }
 
@@ -239,11 +318,29 @@ function resetWeights() {
  * Weight flexibility: ±10% from user selection, minimum 1% if user selected any weight
  */
 async function optimizePortfolio() {
-    // Validate weights
-    const totalWeight = Object.values(currentWeights).reduce((sum, w) => sum + w, 0);
+    // Validate weights (including custom tickers)
+    let totalWeight = Object.values(currentWeights).reduce((sum, w) => sum + w, 0);
+    for (let i = 1; i <= 3; i++) {
+        if (customTickers[i].enabled) {
+            totalWeight += customTickers[i].weight;
+        }
+    }
+
     if (Math.abs(totalWeight - 100) > 0.1) {
         showStatus('Weights must equal 100%', 'error');
         return;
+    }
+
+    // Validate custom tickers have symbols
+    for (let i = 1; i <= 3; i++) {
+        if (customTickers[i].enabled && customTickers[i].weight > 0) {
+            const ticker = document.getElementById(`ticker-custom-${i}`).value.trim().toUpperCase();
+            if (!ticker) {
+                showStatus(`Custom Ticker ${i} is enabled but has no symbol`, 'error');
+                return;
+            }
+            customTickers[i].ticker = ticker;
+        }
     }
 
     // Get parameters
@@ -262,6 +359,7 @@ async function optimizePortfolio() {
         // Step 1: Get yield data for all ETFs with non-zero user weight
         const etfYieldData = [];
 
+        // Process standard ETFs
         for (const etf of Object.keys(currentWeights)) {
             if (currentWeights[etf] <= 0) continue;
 
@@ -277,6 +375,30 @@ async function optimizePortfolio() {
                 }
             } catch (error) {
                 console.error(`Error processing ${etf}:`, error);
+            }
+        }
+
+        // Process custom tickers
+        for (let i = 1; i <= 3; i++) {
+            if (customTickers[i].enabled && customTickers[i].weight > 0 && customTickers[i].ticker) {
+                const ticker = customTickers[i].ticker;
+                try {
+                    showStatus(`Analyzing ${ticker}...`, 'loading');
+                    const optionData = await findBestOptionData(ticker, targetDTE, targetOTM);
+                    if (optionData) {
+                        etfYieldData.push({
+                            etf: ticker,
+                            userWeight: customTickers[i].weight,
+                            isCustom: true,
+                            ...optionData
+                        });
+                    } else {
+                        showStatus(`No options found for ${ticker}`, 'error');
+                    }
+                } catch (error) {
+                    console.error(`Error processing custom ticker ${ticker}:`, error);
+                    showStatus(`Error fetching ${ticker} - check if ticker is valid`, 'error');
+                }
             }
         }
 

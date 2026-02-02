@@ -287,6 +287,83 @@ section h2 {
     color: var(--text-secondary);
 }
 
+/* Custom Tickers Section */
+.custom-tickers-header {
+    margin-top: 1.5rem;
+    margin-bottom: 1rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+}
+
+.custom-tickers-header h3 {
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+}
+
+.custom-tickers-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+@media (max-width: 900px) {
+    .custom-tickers-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 500px) {
+    .custom-tickers-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.custom-ticker-card {
+    border: 2px dashed var(--border);
+}
+
+.custom-ticker-card:hover {
+    border-color: var(--primary);
+    border-style: dashed;
+}
+
+.custom-ticker-card.active {
+    border-style: solid;
+    border-color: var(--primary);
+}
+
+.custom-ticker-input-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.ticker-input {
+    width: 100%;
+    padding: 0.6rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    text-align: center;
+    text-transform: uppercase;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--primary);
+}
+
+.ticker-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(13, 115, 119, 0.2);
+}
+
+.ticker-input::placeholder {
+    color: #aaa;
+    font-weight: 400;
+}
+
 .weight-slider {
     width: 100%;
     margin-top: 0.5rem;
