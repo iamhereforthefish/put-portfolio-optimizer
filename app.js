@@ -9,19 +9,19 @@ const MARKETDATA_API = {
     token: 'X0htSHRqcThNTGJuOUVOb1YxQVRMcGN3cl9XdTd2Y3lrV2ZWN2wzc2FQMD0'
 };
 
-// ETF Universe with default weights
+// ETF Universe with default weights and approximate betas to S&P 500
 const ETF_DATA = {
-    'SPY': { name: 'S&P 500 ETF', weight: 18 },
-    'QQQ': { name: 'Nasdaq-100 ETF', weight: 13 },
-    'IWM': { name: 'Russell 2000 ETF', weight: 9 },
-    'EFA': { name: 'EAFE International', weight: 9 },
-    'EEM': { name: 'Emerging Markets', weight: 9 },
-    'GLD': { name: 'Gold ETF', weight: 9 },
-    'SLV': { name: 'Silver ETF', weight: 9 },
-    'GDX': { name: 'Gold Miners ETF', weight: 9 },
-    'XME': { name: 'Metals & Mining ETF', weight: 5 },
-    'COPX': { name: 'Copper Miners ETF', weight: 5 },
-    'IBIT': { name: 'Bitcoin ETF', weight: 5 }
+    'SPY': { name: 'S&P 500 ETF', weight: 18, beta: 1.00 },
+    'QQQ': { name: 'Nasdaq-100 ETF', weight: 13, beta: 1.15 },
+    'IWM': { name: 'Russell 2000 ETF', weight: 9, beta: 1.20 },
+    'EFA': { name: 'EAFE International', weight: 9, beta: 0.85 },
+    'EEM': { name: 'Emerging Markets', weight: 9, beta: 0.95 },
+    'GLD': { name: 'Gold ETF', weight: 9, beta: 0.05 },
+    'SLV': { name: 'Silver ETF', weight: 9, beta: 0.15 },
+    'GDX': { name: 'Gold Miners ETF', weight: 9, beta: 0.35 },
+    'XME': { name: 'Metals & Mining ETF', weight: 5, beta: 1.10 },
+    'COPX': { name: 'Copper Miners ETF', weight: 5, beta: 1.25 },
+    'IBIT': { name: 'Bitcoin ETF', weight: 5, beta: 1.50 }
 };
 
 // Store current weights
@@ -862,11 +862,55 @@ function calculateVariance(arr) {
 
 /**
  * Calculate portfolio beta to S&P 500
- * β_p = Cov(R_p, R_m) / Var(R_m)
+ * Uses predefined betas for known ETFs, weighted by portfolio allocation
+ * β_portfolio = Σ(weight_i × β_i)
  */
 async function calculatePortfolioBeta(optimizedWeights) {
     try {
         console.log('Starting beta calculation...');
+        console.log('Optimized weights:', optimizedWeights);
+
+        // Use predefined betas for known ETFs (weighted average approach)
+        let weightedBeta = 0;
+        let totalWeight = 0;
+
+        for (const [ticker, weight] of Object.entries(optimizedWeights)) {
+            if (weight <= 0) continue;
+
+            // Check if we have a predefined beta for this ETF
+            if (ETF_DATA[ticker] && ETF_DATA[ticker].beta !== undefined) {
+                weightedBeta += (weight / 100) * ETF_DATA[ticker].beta;
+                totalWeight += weight / 100;
+                console.log(`${ticker}: weight=${weight}%, beta=${ETF_DATA[ticker].beta}`);
+            } else {
+                // For custom tickers, assume beta of 1.0 (market average)
+                weightedBeta += (weight / 100) * 1.0;
+                totalWeight += weight / 100;
+                console.log(`${ticker}: weight=${weight}%, beta=1.0 (assumed)`);
+            }
+        }
+
+        if (totalWeight > 0) {
+            const portfolioBeta = weightedBeta / totalWeight;
+            console.log(`Calculated portfolio beta: ${portfolioBeta.toFixed(2)}`);
+            return portfolioBeta;
+        }
+
+        return null;
+
+    } catch (error) {
+        console.error('Error calculating portfolio beta:', error);
+        return null;
+    }
+}
+
+/**
+ * Calculate portfolio beta using historical data (backup method)
+ * β_p = Cov(R_p, R_m) / Var(R_m)
+ */
+async function calculatePortfolioBetaFromHistory(optimizedWeights) {
+    try {
+        console.log('Starting historical beta calculation...');
         console.log('Optimized weights:', optimizedWeights);
 
         // Fetch SPY (market) historical prices
