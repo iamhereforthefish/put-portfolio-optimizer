@@ -50,9 +50,9 @@ function init() {
         return;
     }
 
-    // Initialize weights from defaults
+    // Initialize all weights to 0 (off by default)
     Object.keys(ETF_DATA).forEach(etf => {
-        currentWeights[etf] = ETF_DATA[etf].weight;
+        currentWeights[etf] = 0;
     });
 
     // Build weights UI
@@ -70,7 +70,8 @@ function buildWeightsGrid() {
     Object.keys(ETF_DATA).forEach(etf => {
         const isIncluded = currentWeights[etf] > 0;
         const card = document.createElement('div');
-        card.className = 'weight-card' + (isIncluded ? '' : ' excluded');
+        // All cards start as excluded (off) by default
+        card.className = 'weight-card excluded';
         card.id = `card-${etf}`;
         card.innerHTML = `
             <div class="weight-card-header">
@@ -78,18 +79,17 @@ function buildWeightsGrid() {
                 <input type="checkbox"
                        class="etf-include-checkbox"
                        id="include-${etf}"
-                       ${isIncluded ? 'checked' : ''}
                        onchange="toggleETFInclusion('${etf}', this.checked)">
             </div>
             <span class="etf-name">${ETF_DATA[etf].name}</span>
             <div class="weight-input-group">
                 <input type="number"
                        id="weight-${etf}"
-                       value="${currentWeights[etf]}"
+                       value="0"
                        min="0"
                        max="100"
                        step="1"
-                       ${isIncluded ? '' : 'disabled'}
+                       disabled
                        onchange="updateWeight('${etf}', this.value)"
                        oninput="updateWeight('${etf}', this.value)">
                 <span>%</span>
@@ -97,11 +97,11 @@ function buildWeightsGrid() {
             <input type="range"
                    class="weight-slider"
                    id="slider-${etf}"
-                   value="${currentWeights[etf]}"
+                   value="0"
                    min="0"
                    max="100"
                    step="1"
-                   ${isIncluded ? '' : 'disabled'}
+                   disabled
                    onchange="updateWeightFromSlider('${etf}', this.value)"
                    oninput="updateWeightFromSlider('${etf}', this.value)">
         `;
@@ -134,6 +134,7 @@ function toggleETFInclusion(etf, included) {
 
 /**
  * Equalize weights among included ETFs only
+ * Accounts for custom ticker weights when distributing
  */
 function equalizeIncludedWeights() {
     // Get all included ETFs
@@ -141,6 +142,17 @@ function equalizeIncludedWeights() {
         const checkbox = document.getElementById(`include-${etf}`);
         return checkbox && checkbox.checked;
     });
+
+    // Calculate total weight already allocated to custom tickers
+    let customTickerWeight = 0;
+    for (let i = 1; i <= 3; i++) {
+        if (customTickers[i].enabled) {
+            customTickerWeight += customTickers[i].weight;
+        }
+    }
+
+    // Available weight for ETFs
+    const availableWeight = 100 - customTickerWeight;
 
     if (includedETFs.length === 0) {
         // No ETFs selected, set all to 0
@@ -150,9 +162,9 @@ function equalizeIncludedWeights() {
             document.getElementById(`slider-${etf}`).value = 0;
         });
     } else {
-        // Calculate equal weight
-        const equalWeight = Math.floor(100 / includedETFs.length);
-        const remainder = 100 - (equalWeight * includedETFs.length);
+        // Calculate equal weight from available
+        const equalWeight = Math.floor(availableWeight / includedETFs.length);
+        const remainder = availableWeight - (equalWeight * includedETFs.length);
 
         // Set excluded ETFs to 0
         Object.keys(ETF_DATA).forEach(etf => {
